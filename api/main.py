@@ -5,8 +5,18 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],  # Adjust methods as needed
+    allow_headers=["*"],
+)
+
 
 CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
 MODEL_VERSION = 1
@@ -14,13 +24,13 @@ MODEL = tf.keras.models.load_model(f'../models/{MODEL_VERSION}')
 
 # DATABASE CONFIG
 DB_CONFIG = {
-    'user': '<username>',
-    'password': '<password>',
-    'host': '<host>',
-    'database': '<dbname>',
+    'user': 'abhinand',
+    'password': 'dmanoj',
+    'host': 'localhost',
+    'database': 'Project',
     'raise_on_warnings': True
 }
-TABLE = "<tablename>"
+TABLE = "Disease"
 
 
 # Ping
@@ -60,7 +70,7 @@ async def predict(
         return "Healthy"
 
     id, name, causes, symptoms, treatment = result
-    # print(id, name, causes, symptoms, treatment)
+    #print(id, name, causes, symptoms, treatment)
 
     return {
         'class': predicted_class,

@@ -67,7 +67,14 @@ async def predict(
     result = cursor.fetchone()
     if result in [None, ""]:
         print("Healthy plant")
-        return "Healthy"
+        return {
+            'class': "Healthy",
+            'confidence': 1,
+            'name': "Healthy",
+            'causes': "nil",
+            'symptoms': "nil",
+            'treatment': "nil"
+        }
 
     id, name, causes, symptoms, treatment = result
     #print(id, name, causes, symptoms, treatment)

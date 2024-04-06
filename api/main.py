@@ -5,9 +5,8 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 import uvicorn
-import smtplib
-import ssl
 from fastapi.middleware.cors import CORSMiddleware
+import requests
 
 app = FastAPI()
 
@@ -60,7 +59,16 @@ async def predict(
     predictions = MODEL.predict(img_batch)
     predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
     confidence = np.max(predictions[0])
-    ####
+
+    ##########
+    url = 'https://auth.radr.in/auth/send_email'
+    headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+
+
+    ##########
 
     # Getting database data
     query = f"SELECT * FROM {TABLE} WHERE Name=\"{predicted_class}\""
@@ -69,6 +77,21 @@ async def predict(
     result = cursor.fetchone()
     if result in [None, ""]:
         print("Healthy plant")
+        # data = {
+        #     'email': 'aswinpradeepc@gmail.com',
+        #     'subject': 'Potato Disease Detection Result',
+        #     'message': '''{
+        #     'class': "Healthy",
+        #     'confidence': 1,
+        #     'name': "Healthy",
+        #     'causes': "There are currently no identifiable causes associated with this condition.",
+        #     'symptoms': "Patients typically do not exhibit any discernible symptoms.",
+        #     'treatment': "As there are no apparent symptoms, no specific treatment regimen is necessary."
+        # }''',
+        # }
+        # response = requests.post(url, json=data, headers=headers)
+        # print(response.status_code)
+        # print(response.text)
         return {
             'class': "Healthy",
             'confidence': 1,
@@ -80,6 +103,22 @@ async def predict(
 
     id, name, causes, symptoms, treatment = result
     #print(id, name, causes, symptoms, treatment)
+
+    # data = {
+    #     'email': 'aswinpradeepc@gmail.com',
+    #     'subject': 'Your Subject Here',
+    #     'message': {
+    #         'class': predicted_class,
+    #         'confidence': float(confidence),
+    #         'name': name,
+    #         'causes': causes,
+    #         'symptoms': symptoms,
+    #         'treatment': treatment
+    # },
+    # }
+    # response = requests.post(url, json=data, headers=headers)
+    # print(response.status_code)
+    # print(response.text)
 
     return {
         'class': predicted_class,

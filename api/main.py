@@ -5,6 +5,8 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 import uvicorn
+import smtplib
+import ssl
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -24,14 +26,13 @@ MODEL = tf.keras.models.load_model(f'../models/{MODEL_VERSION}')
 
 # DATABASE CONFIG
 DB_CONFIG = {
-    'user': 'abhinand',
-    'password': 'dmanoj',
+    'user': 'lays',
+    'password': 'pachalays',
     'host': 'localhost',
-    'database': 'Project',
+    'database': 'potato',
     'raise_on_warnings': True
 }
-TABLE = "Disease"
-
+TABLE = ("table_name")
 
 # Ping
 @app.get("/")
@@ -59,6 +60,7 @@ async def predict(
     predictions = MODEL.predict(img_batch)
     predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
     confidence = np.max(predictions[0])
+    ####
 
     # Getting database data
     query = f"SELECT * FROM {TABLE} WHERE Name=\"{predicted_class}\""
@@ -71,9 +73,9 @@ async def predict(
             'class': "Healthy",
             'confidence': 1,
             'name': "Healthy",
-            'causes': "nil",
-            'symptoms': "nil",
-            'treatment': "nil"
+            'causes': "There are currently no identifiable causes associated with this condition.",
+            'symptoms': "Patients typically do not exhibit any discernible symptoms.",
+            'treatment': "As there are no apparent symptoms, no specific treatment regimen is necessary."
         }
 
     id, name, causes, symptoms, treatment = result
@@ -93,6 +95,6 @@ if __name__ == "__main__":
     cnx = mysql.connector.connect(**DB_CONFIG)
     cursor = cnx.cursor()
 
-    uvicorn.run(app, host='localhost', port=8000)
+    uvicorn.run(app, host='localhost', port=8001)
 
     cnx.close()

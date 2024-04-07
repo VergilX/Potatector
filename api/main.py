@@ -1,12 +1,12 @@
-from io import BytesIO
 from fastapi import FastAPI, File, UploadFile
 import mysql.connector
 import numpy as np
 from PIL import Image
-import tensorflow as tf
+from tensorflow.keras.preprocessing.image import img_to_array
+import io
+from tensorflow.keras.models import load_model
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-import requests
 
 app = FastAPI()
 
@@ -18,10 +18,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+CLASS_NAMES = ['Potato___Bacteria', 'Potato___Early_blight', 'Potato___Fungi', 'Potato___Late_blight', 'Potato___Pest',
+               'Potato___healthy']
 
-CLASS_NAMES = ["Early Blight", "Late Blight", "Healthy"]
-MODEL_VERSION = 1
-MODEL = tf.keras.models.load_model(f'../models/{MODEL_VERSION}')
+MODEL = load_model('/home/aswin/PycharmProjects/Potatector/model/model.h5')
+MODEL.load_weights('/home/aswin/PycharmProjects/Potatector/model/easy_checkpoint')
+
+IMAGE_SIZE = 200
+CHANNELS = 3
 
 # DATABASE CONFIG
 DB_CONFIG = {
@@ -33,65 +37,39 @@ DB_CONFIG = {
 }
 TABLE = ("table_name")
 
+
 # Ping
 @app.get("/")
 async def ping():
     return "Server is running"
 
 
-def read_file_as_image(data) -> np.ndarray:
-    """ Convert image to numpy array """
-
-    image = np.array(Image.open(BytesIO(data)))
-
-    return image
+def predict(image):
+    image = image / 255.0
+    image = np.resize(image, (IMAGE_SIZE, IMAGE_SIZE, CHANNELS))
+    image = np.expand_dims(image, axis=0)
+    preds = MODEL.predict(image)
+    class_idx = np.argmax(preds[0])
+    class_label = CLASS_NAMES[class_idx]
+    confidence = preds[0][class_idx]
+    return class_label, confidence
 
 
 # Use this endpoint to predict result
 @app.post("/predict")
-async def predict(
-    file: UploadFile = File(...)
-):
-    # file -> numpyArray
-    image = read_file_as_image(await file.read())
-    img_batch = np.expand_dims(image, 0)
+async def predict_image(file: UploadFile):
+    image = Image.open(io.BytesIO(await file.read()))
+    image = img_to_array(image)
 
-    predictions = MODEL.predict(img_batch)
-    predicted_class = CLASS_NAMES[np.argmax(predictions[0])]
-    confidence = np.max(predictions[0])
-
-    ##########
-    url = 'https://auth.radr.in/auth/send_email'
-    headers = {
-        'accept': 'application/json',
-        'Content-Type': 'application/json',
-    }
-
-
-    ##########
+    class_label, confidence = predict(image)
 
     # Getting database data
-    query = f"SELECT * FROM {TABLE} WHERE Name=\"{predicted_class}\""
+    query = f"SELECT * FROM {TABLE} WHERE Name=\"{class_label}\""
 
     cursor.execute(query)
     result = cursor.fetchone()
     if result in [None, ""]:
         print("Healthy plant")
-        # data = {
-        #     'email': 'aswinpradeepc@gmail.com',
-        #     'subject': 'Potato Disease Detection Result',
-        #     'message': '''{
-        #     'class': "Healthy",
-        #     'confidence': 1,
-        #     'name': "Healthy",
-        #     'causes': "There are currently no identifiable causes associated with this condition.",
-        #     'symptoms': "Patients typically do not exhibit any discernible symptoms.",
-        #     'treatment': "As there are no apparent symptoms, no specific treatment regimen is necessary."
-        # }''',
-        # }
-        # response = requests.post(url, json=data, headers=headers)
-        # print(response.status_code)
-        # print(response.text)
         return {
             'class': "Healthy",
             'confidence': 1,
@@ -102,32 +80,16 @@ async def predict(
         }
 
     id, name, causes, symptoms, treatment = result
-    #print(id, name, causes, symptoms, treatment)
-
-    # data = {
-    #     'email': 'aswinpradeepc@gmail.com',
-    #     'subject': 'Your Subject Here',
-    #     'message': {
-    #         'class': predicted_class,
-    #         'confidence': float(confidence),
-    #         'name': name,
-    #         'causes': causes,
-    #         'symptoms': symptoms,
-    #         'treatment': treatment
-    # },
-    # }
-    # response = requests.post(url, json=data, headers=headers)
-    # print(response.status_code)
-    # print(response.text)
 
     return {
-        'class': predicted_class,
-        'confidence': float(confidence),
+        'class': class_label,
+        'confidence': float(confidence)*100,
         'name': name,
         'causes': causes,
         'symptoms': symptoms,
         'treatment': treatment
     }
+
 
 if __name__ == "__main__":
     # Database connection
